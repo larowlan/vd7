@@ -1,0 +1,13 @@
+*.DS_Store
+*.sass-cache
+build.properties
+.idea
+.vagrant
+.bundle
+puppet/modules/*
+!puppet/modules/README.md
+puppet/.librarian
+puppet/.tmp
+patches
+vendor
+bin
