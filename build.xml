@@ -11,24 +11,28 @@
   <!-- ============= -->
 
   <!-- Drupal -->
-  <property name="drupal.siteName" value="&quot;Drupal 7 Site&quot;" />
+  <property name="drupal.siteName" value="Drupal7" />
   <property name="drupal.email" value="user@example.com" />
   <property name="drupal.user" value="admin" />
-  <property name="drupal.pass" value="power" />
+  <property name="drupal.pass" value="password" />
   <property name="drupal.dir" value="${project.basedir}/app" />
-  <property name="drupal.themename" value="custom" />
-  <property name="custom.themedir" value="${project.basedir}/app/sites/all/themes/custom/${drupal.themename}" />
+  <property name="drupal.profile" value="standard" />
+  <property name="drupal.url" value="http://d7.dev" />
+  <property name="last.test" value="BlockTestCase" />
+
+  <!-- Modules -->
+  <property name="modules.enable" value="false" />
 
   <!-- Mysql -->
   <property name="mysql.host" value="d7.dev" />
   <property name="mysql.port" value="3306" />
-  <property name="mysql.database" value="d7" />
-  <property name="mysql.user" value="d7" />
-  <property name="mysql.pass" value="d7" />
+  <property name="mysql.database" value="local" />
+  <property name="mysql.user" value="drupal" />
+  <property name="mysql.pass" value="drupal" />
   <property name="mysql.queryString" value="mysql://${mysql.user}:${mysql.pass}@${mysql.host}/${mysql.database}" />
 
   <!-- Drush -->
-  <property name="drush.cmd" value="bin/drush -r ${drupal.dir}" />
+  <property name="drush.cmd" value="${project.basedir}/bin/drush -r ${drupal.dir}" />
 
   <!-- Vagrant -->
   <property name="vagrant.dir" value="/vagrant" />
@@ -39,6 +43,7 @@
 
   <!-- Provide overrides. -->
   <property file="build.properties" override="true" />
+  <property file="last.test.properties" override="true" />
 
   <!--         -->
   <!-- Targets -->
@@ -52,31 +57,19 @@
           passthru="${test.passthru}" />
   </target>
 
-  <!-- Runs a command in the Vagrant host -->
-  <target name="vagrant:run"
-          if="drush.cmd"
-          description="Run a command in the vagrant host.">
-    <exec command="vagrant ssh -c '${vagrant.cmd}'"
-          logoutput="${test.output}"
-          passthru="${test.passthru}" />
-  </target>
-
   <!-- Reinstall the site. -->
   <target name="reinstall"
           depends="prepare"
           description="Reinstall the Drupal site (warning removes all files/database).">
     <!-- Drop and create the database -->
-    <exec command="${drush.cmd} sql-drop -y"
-          logoutput="${test.output}"
-          passthru="${test.passthru}"/>
-
+    <phingcall target="db:drop" />
     <!-- Ensure the files directory is clean -->
     <exec command="sudo rm -fR ${drupal.dir}/sites/default/files/*"
           logoutput="${test.output}"
           passthru="${test.passthru}" />
 
     <!-- Ensure we have a fresh settings.php with correct permissions -->
-    <exec command="sudo scp ${drupal.dir}/sites/default/default.settings.php ${drupal.dir}/sites/default/settings.php"
+    <exec command="sudo cp ${drupal.dir}/sites/default/default.settings.php ${drupal.dir}/sites/default/settings.php"
           logoutput="${test.output}"
           passthru="${test.passthru}" />
     <exec command="sudo chmod 777 ${drupal.dir}/sites/default/settings.php"
@@ -85,66 +78,103 @@
 
     <!-- Install the site and simpletest -->
     <phingcall target="install" />
+    <if>
+      <equals arg1="${modules.enable}" arg2="true" />
+      <then>
+        <phingcall target="enable:modules" />
+      </then>
+    </if>
     <phingcall target="simpletest:enable" />
-    <phingcall target="views_ui:enable" />
   </target>
 
   <!-- Install the Drupal site. -->
   <target name="install"
-          description="Install the Drupal site.">
-    <phingcall target="vagrant:run">
-      <!-- After some properties for inside the Vagrant host. -->
-      <property name="vagrant.cmd" value="cd ${vagrant.dir}; bin/drush -r ${vagrant.dir}/app site-install standard -y --db-url=${mysql.queryString} --account-mail=${drupal.email} --account-name=${drupal.user} --account-pass=${drupal.pass} --site-name=${drupal.siteName}" />
-    </phingcall>
-    <phingcall target="vagrant:run">
-      <!-- After some properties for inside the Vagrant host. -->
-      <property name="vagrant.cmd" value="cd ${vagrant.dir}; bin/drush -r ${vagrant.dir}/app -l ${app.uri} uli" />
-    </phingcall>
+          description="Install the Drupal 8 site.">
+    <exec command="${drush.cmd} site-install ${drupal.profile} -y --db-url=${mysql.queryString} --account-mail=${drupal.email} --account-name=${drupal.user} --account-pass=${drupal.pass} --site-name=${drupal.siteName}"
+          logoutput="true"
+          passthru="true"/>
+  </target>
+
+  <!-- Drop the database of the Drupal 8 site. -->
+  <target name="db:drop"
+          description="Drop the database.">
+    <exec command="${drush.cmd} sql-drop -y"
+          logoutput="true"
+          passthru="true"/>
+  </target>
+
+  <!-- Enable given modules -->
+  <target name="enable:modules"
+          description="Enable the contrib modules.">
+    <if>
+      <not><isset property="modules.list" /></not>
+      <then>
+        <input message="Enter module name seprated by space." propertyName="modules.list"
+               defaultValue="views views_ui" />
+      </then>
+    </if>
+    <exec command="${drush.cmd} en -y ${modules.list}"
+          logoutput="true"
+          passthru="true"/>
   </target>
 
   <!-- Enable Simpletest module -->
   <target name="simpletest:enable"
           description="Enable the Testing module.">
-    <phingcall target="vagrant:run">
-      <!-- After some properties for inside the Vagrant host. -->
-      <property name="vagrant.cmd" value="cd ${vagrant.dir}; bin/drush -r ${vagrant.dir}/app en -y simpletest" />
-    </phingcall>
+    <exec command="${drush.cmd} en -y simpletest"
+          logoutput="true"
+          passthru="true"/>
   </target>
 
-    <!-- Enable Views dev settings -->
-  <target name="views_ui:enable"
-          description="Enable the Views UI module.">
-    <phingcall target="vagrant:run">
-       <!-- After some properties for inside the Vagrant host. -->
-      <property name="vagrant.cmd" value="cd ${vagrant.dir}; bin/drush -r ${vagrant.dir}/app en -y views_ui" />
-    </phingcall>
-    <phingcall target="vagrant:run">
-      <!-- After some properties for inside the Vagrant host. -->
-      <property name="vagrant.cmd" value="cd ${vagrant.dir}; bin/drush -r ${vagrant.dir}/app views-dev" />
-    </phingcall>
+  <!-- Test a class -->
+  <target name="simpletest:class"
+          description="Test a test class using simpletest.">
+    <input propertyName="test.class"
+           defaultValue="${last.test}"
+           message="Enter class name with namespace." />
+
+    <exec command="cd ${vagrant.dir}/app; php ./scripts/run-tests.sh --php `which php` --concurrency 12 --url http://d7.dev  --verbose --color --class '${test.class}'"
+          logoutput="true"
+          passthru="true"/>
+    <echo file="${project.basedir}/last.test.properties" message="last.test=${test.class}" />
   </target>
 
-  <!--                 -->
-  <!-- Compass targets -->
-  <!-- =============== -->
-
-  <target name="compass:compile"
-          depends="compass:clean"
-          description="Compile all sass files for production">
-    <exec command="bundle exec compass compile -e production --force ${project.basedir}/${custom.themedir}"
-          passthru="${test.passthru}" />
+  <!-- Test a group -->
+  <target name="simpletest:group"
+          description="Test a test group using simpletest.">
+    <input propertyName="test.group"
+           defaultValue="action"
+           message="Enter group name." />
+    <exec command="cd ${vagrant.dir}/app; php ./scripts/run-tests.sh --php `which php` --concurrency 12 --url http://d8.dev  --verbose --color '${test.group}'"
+          logoutput="true"
+          passthru="true"/>
   </target>
 
-  <target name="compass:watch"
-          depends="compass:clean"
-          description="Watch sass directories for changes and compile files on change">
-    <exec command="bundle exec compass watch -e development ${project.basedir}/${custom.themedir}"
-          passthru="${test.passthru}" />
+  <!-- Clean temporary tables and files created by Simpletest module. -->
+  <target name="simpletest:clean"
+          description="Enable the Testing module.">
+    <exec command="${drush.cmd} test-clean"
+          logoutput="true"
+          passthru="true"/>
   </target>
-  <target name="compass:clean"
-          description="Cleanup compass files">
-    <exec command="bundle exec compass clean ${project.basedir}/${custom.themedir}"
-          passthru="${test.passthru}" />
+
+  <!-- PHP CS -->
+  <target name="phpcs:dir"
+          description="Check the coding standard of give directory.">
+    <input propertyName="phpcs.path"
+           defaultValue="core"
+           message="Enter the path of directory." />
+    <exec command="cd ${vagrant.dir}/app; ../bin/phpcs --report=full --standard='../vendor/drupal/coder/coder_sniffer/Drupal' ${phpcs.path}"
+          logoutput="true"
+          passthru="true"/>
+  </target>
+
+  <!-- Install the Drupal 8 site. -->
+  <target name="login"
+          description="Log into the Drupal 8 site.">
+    <exec command="${drush.cmd} -l ${drupal.url} uli"
+          logoutput="true"
+          passthru="true"/>
   </target>
 
 </project>

@@ -9,39 +9,18 @@ Basic D7 Vagrant setup
 
 By @larowlan (drupal.org/u/larowlan)
 
-Vagrant/Puppet manifests: Adapted from github.com/nickshuch/vd8 by Nick Schuch (nick_schuch) (Previous Next)
+Vagrant: Adapted from github.com/nickshuch/vd8 by Nick Schuch (nick_schuch) (Previous Next)
 
 ## Requirements for local dev
 
-### Bundler
 
-Install required gems for theme development with
-
-```
-bundle install --path vendor/bundle
-```
-
-Setup theme compass support by adding this to your build.properties
-```
-drupal.themename = "yourthemename"
-```
-
-Build sass with one of
-```
-phing compass:watch
-```
-or
-```
-phing compass:compile
-```
-
-### Virtualbox (4.3.6)
+### Virtualbox (5 or above)
 
 Virtualbox can be downloaded and installed from:
 
 https://www.virtualbox.org/wiki/Downloads
 
-### Vagrant (1.3 to 1.5)
+### Vagrant (1.9 or above)
 
 Vagrant can be downloaded and installed from:
 
@@ -51,13 +30,15 @@ This also required the autonetwork plugin which can be installed by:
 
 ```
 vagrant plugin install vagrant-auto_network
+vagrant plugin install vagrant-hostsupdater
 ```
 
 #### Plugins
 
 These are software versions we know work:
 
-* Vagrant Auto-network: 0.2.1
+* Vagrant Auto-network: 1.0.2
+* Vagrant Hostsupdater: 1.0.2
 
 #### Usage
 
